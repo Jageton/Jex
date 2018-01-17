@@ -1,0 +1,13 @@
+bot:
+  token: 471159374:AAE08qbi2CMpQ4wgZxPcfBpQnfV0G91tThY
+  username: Derexte_bot
+  payment-token:
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bot_db
+    username: jageton
+    password: QWEsZadXC
+    driver-class-name: org.postgresql.Driver
+liquibase:
+  enabled: true
+  change-log: classpath:/db/changelog/db.changelog-master.xml

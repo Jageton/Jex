@@ -1,0 +1,103 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'org.ajoberstar', name: 'grgit', version: '1.4.1'
+    }
+}
+
+plugins {
+    id 'org.springframework.boot' version '1.5.8.RELEASE'
+}
+
+import org.ajoberstar.grgit.Commit
+import org.ajoberstar.grgit.Grgit
+
+class GitInfo {
+    boolean missing
+    boolean valid
+    String commit
+    String branch
+    String committerDate
+}
+
+GitInfo readGitInfo() {
+    def missing = false
+    def valid = true
+    def branch
+    def commit
+    def committerDate
+    try {
+        Grgit grgit = Grgit.open(currentDir: project.projectDir)
+        branch = grgit.branch.current.name
+        Commit head = grgit.head()
+        commit = head.abbreviatedId
+        committerDate = head.date.format('yyyy-MM-dd HH:mm:ss Z')
+    } catch (ignored) {
+        missing = true
+        // When MODE_IGNORE is used, we skip outputting related info
+        valid = false
+        branch = "unknown"
+        commit = "unknown"
+        committerDate = "unknown"
+    }
+    new GitInfo(missing: missing,
+            valid: valid,
+            branch: branch,
+            commit: commit,
+            committerDate: committerDate)
+}
+
+apply plugin: 'java'
+
+group = 'ru.tstu.telegram.bot'
+version = '0.1-SNAPSHOT'
+
+description = """telegram-bot"""
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+repositories {
+    maven { url "https://jitpack.io" }
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'com.github.xabgesagtx', name: 'telegram-spring-boot-starter', version: '0.12'
+    compile group: 'org.springframework.boot', name: 'spring-boot-configuration-processor'
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc'
+    compile group: 'org.postgresql', name: 'postgresql'
+
+    compile "org.liquibase:liquibase-core"
+
+    compile group: 'org.apache.commons', name: 'commons-collections4', version: '4.1'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.6'
+}
+
+jar {
+    def attributes = [:] as Map<String, ?>
+    GitInfo gitInfo = readGitInfo()
+
+    if (gitInfo.missing) {
+        logger.warn "Could not read .git directory. Git info will not be included in the manifest or will be replaced to invalid values."
+    }
+    if (gitInfo.valid) {
+        attributes["Git-Branch"] = gitInfo.branch
+        attributes["Git-Commit"] = gitInfo.commit
+        attributes["Git-Committer-Date"] = gitInfo.committerDate
+    }
+    attributes["Build-Date"] = new Date().format('yyyy-MM-dd HH:mm:ss Z')
+    attributes["Build-Java-Version"] = System.properties['java.version']
+    attributes["Build-Java-Vendor"] = System.properties['java.vendor']
+    attributes["Build-Os-Name"] = System.properties['os.name']
+    attributes["Build-Os-Version"] = System.properties['os.version']
+
+    manifest {
+        it.attributes(attributes)
+    }
+}
