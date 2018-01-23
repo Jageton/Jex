@@ -55,12 +55,12 @@ public class TstuBot extends TelegramLongPollingBot {
         n.SetName("Profile");
         index = BotTreeMenu.AddNode(0, n);
 
-        n = new Node(NODE.Status.FinalNode);
+        /*n = new Node(NODE.Status.FinalNode);
         kbb = new KeyboardButton().setText("Statistic");
         n.setKeyboardButton(kbb);
-        n.SetIResponse((SendMessage response) -> response.setText("Statistic should be there"));
+        n.SetIResponse((SendMessage response, Integer userId) -> response.setText("Statistic should be there"));
         n.SetName("Statistic");
-        BotTreeMenu.AddNode(index, n);
+        BotTreeMenu.AddNode(index, n);*/
 
         n = new Node(NODE.Status.PorterNode);
         kbb = new KeyboardButton().setText("My Tasks");
@@ -72,22 +72,29 @@ public class TstuBot extends TelegramLongPollingBot {
         kbb = new KeyboardButton().setText("My solving tasks");
         n.setKeyboardButton(kbb);
         n.setName("My solving tasks");
-        n.SetIResponse(
-                (SendMessage response) -> response.setText("My solving tasks should be there"));
+        n.SetIResponse((SendMessage response, Integer userId) -> //response.setText("My solving tasks should be there"));
+        {
+            messagesDAOService.getFollowTasks(response, userId);
+            return response;
+        });
         BotTreeMenu.AddNode(index, n);
 
-        n = new Node(NODE.Status.FinalNode);
+        /*n = new Node(NODE.Status.FinalNode);
         kbb = new KeyboardButton().setText("My added tasks");
         n.setKeyboardButton(kbb);
         n.setName("My added tasks");
-        n.SetIResponse((SendMessage response) -> response.setText("My added tasks should be there"));
-        BotTreeMenu.AddNode(index, n);
+        n.SetIResponse((SendMessage response, Integer userId) -> response.setText("My added tasks should be there"));
+        BotTreeMenu.AddNode(index, n);*/
 
         n = new Node(NODE.Status.FinalNode);
         kbb = new KeyboardButton().setText("My current task");
         n.setKeyboardButton(kbb);
         n.setName("My current task");
-        n.SetIResponse((SendMessage response) -> response.setText("My current task should be there"));
+        n.SetIResponse((SendMessage response, Integer userId) -> //response.setText("My current task should be there"));
+        {
+            messagesDAOService.getCurrentTask(response, userId);
+            return response;
+        });
         BotTreeMenu.AddNode(index, n);
 
         n = new Node(NODE.Status.PorterNode);
@@ -101,7 +108,7 @@ public class TstuBot extends TelegramLongPollingBot {
         kbb = new KeyboardButton().setText("Get all tasks");
         n.setKeyboardButton(kbb);
         n.setName("Get all tasks");
-        n.SetIResponse((SendMessage response) -> {
+        n.SetIResponse((SendMessage response, Integer userId) -> {
             messagesDAOService.getAllTasks(response);
             return response;
         });
@@ -111,19 +118,27 @@ public class TstuBot extends TelegramLongPollingBot {
         kbb = new KeyboardButton().setText("Get Last Task");
         n.setKeyboardButton(kbb);
         n.setName("Get Last Task");
-        n.SetIResponse((SendMessage response) -> {
+        n.SetIResponse((SendMessage response, Integer userId) -> {
             messagesDAOService.getLastTask(response);
             return response;
         });
         BotTreeMenu.AddNode(index, n);
 
-        n = new Node(NODE.Status.FinalNode);
+        n = new Node(NODE.Status.DialogNode);
         kbb = new KeyboardButton().setText("Chose task");
         n.setKeyboardButton(kbb);
         n.setName("Chose task");
-        n.SetIResponse((SendMessage response) -> {
-            messagesDAOService.getChoseTask(response);
-            return response;
+        n.setIresponseDialog((SendMessage response, String text, Integer userId, int number) -> {
+            switch (number)
+            {
+                case 0:
+                    response.setText("Enter number of task");
+                    return true;
+                case 1:
+                   messagesDAOService.getChoseTask(response, text);
+                   return false;
+                   default: return false;
+            }
         });
         BotTreeMenu.AddNode(index, n);
     }
@@ -144,47 +159,50 @@ public class TstuBot extends TelegramLongPollingBot {
         return username;
     }
 
+    /*public void Follow(SendMessage response, String text, Integer userId){
+
+    }
+
+    public void Solve(SendMessage response, String text, Integer userId){
+
+    }*/
+
     @Autowired
     private MessagesDAOService messagesDAOService;
 
+    public OptionOfTusk OptOfTusk;
 
     @Override
     public void onUpdateReceived(Update update) {
         String text;
-        if(update.hasCallbackQuery()) {
-            CallbackQuery qlb = update.getCallbackQuery();
-            text = qlb.getData();
-            Message message = qlb.getMessage();
-
+        if(update.hasMessage()) {
+            Message message = update.getMessage();
             SendMessage response = new SendMessage();
             Long chatId = message.getChatId();
-            if(!BotTreeMenu.ChatIsNew(chatId)){
+            if (!BotTreeMenu.ChatIsNew(chatId)) {
                 BotTreeMenu.InitNewChat(chatId);
             }
             response.setChatId(chatId);
             response.enableMarkdown(true);
-            response = BotTreeMenu.GetResponse(response,text, chatId);
+            response = BotTreeMenu.GetResponse(response, message.getText(), chatId, message.getFrom().getId());
             try {
                 sendApiMethod(response);
             } catch (TelegramApiException e) {
                 logger.error("Error: {}, cause: {}", e.getMessage(), e.getCause());
             }
-            return;
-
-        }
-        Message message = update.getMessage();
-        SendMessage response = new SendMessage();
-        Long chatId = message.getChatId();
-        if(!BotTreeMenu.ChatIsNew(chatId)){
-            BotTreeMenu.InitNewChat(chatId);
-        }
-        response.setChatId(chatId);
-        response.enableMarkdown(true);
-        response = BotTreeMenu.GetResponse(response,message.getText(), chatId);
-        try {
-            sendApiMethod(response);
-        } catch (TelegramApiException e) {
-            logger.error("Error: {}, cause: {}", e.getMessage(), e.getCause());
+        }else if(update.hasCallbackQuery()){
+           CallbackQuery message = update.getCallbackQuery();
+           SendMessage response = new SendMessage();
+           Long chatId = message.getMessage().getChatId();
+           response.setChatId(chatId);
+           response.enableMarkdown(true);
+            OptOfTusk.ExecuteCommand(response, message.getData(), message.getFrom().getId());
+            try {
+                sendApiMethod(response);
+            } catch (TelegramApiException e) {
+                logger.error("Error: {}, cause: {}", e.getMessage(), e.getCause());
+            }
         }
     }
+
 }

@@ -45,10 +45,49 @@ public class MessagesDAOService extends JdbcDaoSupport {
         response.setText(msg);
     }
 
-    public void getChoseTask(SendMessage response){
-        SqlRowSet drs = getJdbcTemplate().queryForRowSet("SELECT task_id,task_name,task_text FROM all_tasks WHERE task_id = 1");
+    public void getChoseTask(SendMessage response, String text) {
+        SqlRowSet drs = getJdbcTemplate().queryForRowSet("SELECT task_id,task_name,task_text FROM all_tasks WHERE task_id = " + text);
         drs.next();
         response.setText(drs.getString("task_name") + "\n" + drs.getString("task_text"));
     }
 
+    public void getCurrentTask(SendMessage response, Integer userId){
+        SqlRowSet drs = getJdbcTemplate().queryForRowSet("SELECT task_id,task_name,task_text FROM all_tasks WHERE task_id = " +
+                "(SELECT global_task_id FROM current_task WHERE user_id =" + userId + ")");
+        drs.next();
+        response.setText(drs.getString("task_name") + "\n" + drs.getString("task_text"));
+    }
+
+    public void getFollowTasks(SendMessage response, Integer userId){
+        SqlRowSet drs = getJdbcTemplate().queryForRowSet("SELECT task_id,task_name,task_description FROM all_tasks WHERE task_id = " +
+                "(SELECT global_task_id FROM follow_tasks WHERE user_id = " + userId + ")");
+
+        String msg = "";
+        while(drs.next()){
+            msg += drs.getString("task_id") + ": "  + drs.getString("task_name")
+                    + "\n" + drs.getString("task_description") + "\n";
+        }
+        response.setText(msg);
+    }
+    /*SqlRowSet drs = getJdbcTemplate().queryForRowSet("SELECT global_task_id FROM follow_tasks WHERE user_id =" + userId);
+        String msg = "";
+        while(drs.next()){
+        SqlRowSet drs2 = getJdbcTemplate().queryForRowSet("SELECT task_id,task_name,task_description FROM all_tasks WHERE task_id = " +
+                drs.getString("global_task_id"));
+            msg += drs2.getString("task_id") + ": "  + drs2.getString("task_name")
+                    + "\n" + drs2.getString("task_description") + "\n";
+        }
+        response.setText(msg);*/
+
+    /*
+    SqlRowSet drs = getJdbcTemplate().queryForRowSet("SELECT task_id,task_name,task_description FROM all_tasks WHERE task_id = " +
+                "(SELECT global_task_id FROM follow_tasks WHERE user_id =" + userId + ")");
+
+        String msg = "";
+        while(drs.next()){
+            msg += drs.getString("task_id") + ": "  + drs.getString("task_name")
+                    + "\n" + drs.getString("task_description") + "\n";
+        }
+        response.setText(msg);
+        */
 }

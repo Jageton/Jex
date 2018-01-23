@@ -9,12 +9,18 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.util.*;
 
+interface  IResponseDialog{
+    boolean GetResponseDialog(SendMessage response, String text, Integer userId, int number);
+}
+
 class BotTree{
     private HashMap<Integer,Node> Nodes;
     private HashMap<Long,NODE> CurrentStates;
     public BotTree(){
         Nodes = new HashMap<>();
     }
+    private  boolean isDialog;
+    private Dialog DialogSession;
 
     public int Init(Node node){
         int i = Nodes.size();
@@ -49,22 +55,31 @@ class BotTree{
         CurrentStates.put(chatId, Nodes.get(0));
     }
 
-    public SendMessage GetResponse(SendMessage response, String text, long chatId){
+    public SendMessage GetResponse(SendMessage response, String text, long chatId, Integer userId){
+        if(isDialog){
+            isDialog = DialogSession.EnterDialog(response, text, userId);
+            return response;
+        }
         NODE buf = CurrentStates.get(chatId).getNextNode(text);
         if(buf != null) {
             if(buf.getNodeStatus() == NODE.Status.PorterNode) {
                 CurrentStates.put(chatId, buf);
+            }else if(buf.getNodeStatus() == Node.Status.DialogNode){
+                DialogSession = new Dialog((Node)buf);
+                isDialog = true;
+                DialogSession.EnterDialog(response, text, userId);
+                return response;
             }
             response.setText(buf.getName());
-            return buf.Get(response);
+            return buf.Get(response, userId);
         }
         response.setText("Start");
-        return CurrentStates.get(chatId).Get(response);
+        return CurrentStates.get(chatId).Get(response,userId);
     }
 }
 @XmlRootElement
 abstract  class NODE implements  IResponse{
-    enum Status { PorterNode, FinalNode }
+    enum Status { PorterNode, FinalNode, DialogNode }
     protected   Status NodeStatus;
     protected   KeyboardButton keyboardButton;
     protected   String Name;
@@ -109,7 +124,7 @@ abstract  class NODE implements  IResponse{
         NodeStatus = status;
     }
 
-    public abstract SendMessage Get(SendMessage reponse);
+    public abstract SendMessage Get(SendMessage reponse, Integer userId);
     public abstract NODE getNextNode(String name);
     public abstract NODE getNode();
 
@@ -125,7 +140,7 @@ class ParentNode extends NODE{
     }
 
     @Override
-    public SendMessage Get(SendMessage reponse) {
+    public SendMessage Get(SendMessage reponse, Integer userId) {
         return null;
     }
 
@@ -140,18 +155,19 @@ class ParentNode extends NODE{
     }
 
     @Override
-    public SendMessage GetResponse(SendMessage response) {
+    public SendMessage GetResponse(SendMessage response, Integer userId) {
         return null;
     }
 }
 
 interface IResponse {
-    SendMessage GetResponse(SendMessage response);
+    SendMessage GetResponse(SendMessage response, Integer userId);
 }
 
-class Node extends NODE implements  IResponse{
+class Node extends NODE implements  IResponse, IResponseDialog{
     private HashMap<String,Integer> Indexes;
     private List<NODE> ChildNodes;
+    private IResponseDialog IresponseDialog;
 
     public String GetName(){
         return Name;
@@ -168,6 +184,15 @@ class Node extends NODE implements  IResponse{
         Indexes = new HashMap<>();
     }
 
+    public void setIresponseDialog(IResponseDialog ird)
+    {
+        IresponseDialog = ird;
+    }
+
+    public IResponseDialog getIresponseDialog() {
+        return IresponseDialog;
+    }
+
     public void SetIResponse(IResponse Iresponse){
         this.Iresponse = Iresponse;
     }
@@ -177,15 +202,15 @@ class Node extends NODE implements  IResponse{
     }
 
     @Override
-    public SendMessage GetResponse(SendMessage response) {
-        return Iresponse.GetResponse(response);
+    public SendMessage GetResponse(SendMessage response,Integer userId) {
+        return Iresponse.GetResponse(response, userId);
     }
 
     @Override
-    public SendMessage Get(SendMessage response){
+    public SendMessage Get(SendMessage response, Integer userId){
         switch (NodeStatus){
             case FinalNode:
-                GetResponse(response);
+                GetResponse(response, userId);
                 break;
             case PorterNode:
                 GetButtons(response);
@@ -227,6 +252,11 @@ class Node extends NODE implements  IResponse{
     @Override
     public NODE getNode(){
         return this;
+    }
+
+    @Override
+    public boolean GetResponseDialog(SendMessage response, String text, Integer userId, int number) {
+       return IresponseDialog.GetResponseDialog(response, text, userId, number);
     }
 }
 
